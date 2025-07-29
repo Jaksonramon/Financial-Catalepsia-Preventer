@@ -63,7 +63,7 @@ for cat in flexible_categories:
 # ----------------------------
 # Add Expense
 # ----------------------------
-st.title("💳 Daily Expense Tracker")
+st.title("💳 Financial Catalepsia Preventer")
 with st.form("expense_form"):
     date = st.date_input("Date", value=datetime.today())
     category = st.selectbox("Category", list(fixed_expenses.keys()) + flexible_categories)
