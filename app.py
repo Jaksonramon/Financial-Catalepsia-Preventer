@@ -65,15 +65,18 @@ for cat in flexible_categories:
 # ----------------------------
 st.title("💳 Daily Expense Tracker")
 with st.form("expense_form"):
-    date = st.date_input("Date", value=datetime.today())
-    category = st.selectbox("Category", list(fixed_expenses.keys()) + flexible_categories)
-    amount = st.number_input("Amount", step=1000, key="amount")
-    note = st.text_input("Note (optional)", key="note")
-    submit = st.form_submit_button("Add Expense")
-    clear = st.form_submit_button("Clear Inputs")
+ date = st.date_input("Date", value=datetime.today(), key="date")
+category = st.selectbox("Category", list(fixed_expenses.keys()) + flexible_categories, key="category")
+amount = st.number_input("Amount", step=1000, key="amount")
+note = st.text_input("Note (optional)", key="note")
+submit = st.form_submit_button("Add Expense")
+clear = st.form_submit_button("Clear Inputs")
 
 if clear:
-    st.experimental_rerun()
+    st.session_state.date = datetime.today()
+    st.session_state.category = list(fixed_expenses.keys())[0]  # or flexible
+    st.session_state.amount = 0
+    st.session_state.note = ""
 
 if submit:
     new_expense = pd.DataFrame([[date.isoformat(), category, amount, note]], columns=["Date", "Category", "Amount", "Note"])
