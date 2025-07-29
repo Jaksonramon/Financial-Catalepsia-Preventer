@@ -1,98 +1,62 @@
-
 import streamlit as st
 import pandas as pd
-import json
-from datetime import datetime
-from pathlib import Path
+import datetime
 
-st.set_page_config(page_title="Budget Tracker", layout="centered")
+st.set_page_config(page_title="Financial Catalepsia Preventer", layout="wide")
 
-st.markdown("""
-    <style>
-        * {
-            font-family: monospace;
-        }
-        .stButton > button {
-            border-radius: 5px;
-            background-color: #4CAF50;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            cursor: pointer;
-        }
-        .stButton > button:hover {
-            background-color: #45a049;
-        }
-    </style>
-""", unsafe_allow_html=True)
+# Sidebar controls
+st.sidebar.title("Controls")
+uploaded_file = st.sidebar.file_uploader("Upload your .csv bank statement", type="csv")
+date_range = st.sidebar.date_input("Select date range", [datetime.date.today().replace(day=1), datetime.date.today()])
 
-DATA_FILE = "expenses.json"
+# Fixed categories to simulate unavoidable costs
 FIXED_CATEGORIES = {
-    "Rent": 800000,
-    "Transport": 130000,
-    "Internet": 70000,
-    "Pharmaceutical": 60000,
+    "Rent": 1000000,
+    "Utilities": 250000,
+    "Groceries": 500000
 }
 
-# Initialize or load data
-if Path(DATA_FILE).exists():
-    df = pd.read_json(DATA_FILE)
-else:
-    df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
+st.title("💸 Financial Catalepsia Preventer")
+st.write("Helps you identify where you’re bleeding money before it kills your will to live.")
 
-# Header
-st.title("💰 Monthly Budget Tracker")
+if uploaded_file is not None:
+    try:
+        df = pd.read_csv(uploaded_file)
+        df.columns = [col.strip() for col in df.columns]  # Clean up column names
 
-# Input fields
-with st.form("expense_form"):
-    st.subheader("➕ Add New Expense")
-    category = st.selectbox("Select a category", list(FIXED_CATEGORIES.keys()) + ["Groceries", "Eating Out", "Other"])
-    amount = st.number_input("Amount", min_value=0)
-    note = st.text_input("Note (optional)")
-    submitted = st.form_submit_button("Add Expense")
+        # Show raw data
+        st.subheader("Raw Statement Data")
+        st.dataframe(df.head())
 
-if submitted:
-    new_expense = {
-        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "Category": category,
-        "Amount": amount,
-        "Note": note,
-    }
-    df = pd.concat([df, pd.DataFrame([new_expense])], ignore_index=True)
-    df.to_json(DATA_FILE, orient="records", indent=4)
-    st.success("Expense added!")
-
-# Clear entries section
-st.subheader("🧹 Manage Entries")
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("Undo Last Entry"):
-        if not df.empty:
-            df = df[:-1]
-            df.to_json(DATA_FILE, orient="records", indent=4)
-            st.warning("Last entry removed.")
+        # Ensure proper column names exist
+        if "Amount" not in df.columns or "Category" not in df.columns or "Date" not in df.columns:
+            st.error("CSV must contain 'Amount', 'Category', and 'Date' columns.")
         else:
-            st.info("No entries to remove.")
+            # Preprocessing
+            df["Date"] = pd.to_datetime(df["Date"], errors='coerce')
+            df = df.dropna(subset=["Date"])
+            df = df[(df["Date"] >= pd.to_datetime(date_range[0])) & (df["Date"] <= pd.to_datetime(date_range[1]))]
 
-with col2:
-    if st.button("Clear All Expenses"):
-        df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
-        df.to_json(DATA_FILE, orient="records", indent=4)
-        st.error("All data cleared.")
+            # Show filtered data
+            st.subheader("Filtered Transactions")
+            st.dataframe(df)
 
-# Budget Summary
-st.subheader("📊 Budget Overview")
-total_budget = 1200000  # Set your total monthly budget here
-total_spent = df["Amount"].sum() + sum(FIXED_CATEGORIES.values())
-remaining_budget = total_budget - total_spent
-progress = total_spent / total_budget
+            # Summaries
+            total_spent = df["Amount"].sum() + sum(FIXED_CATEGORIES.values())
+            st.subheader("📊 Summary")
+            st.write(f"**Total Spent (including fixed costs):** ${total_spent:,.0f}")
 
-st.metric("Total Budget", f"${total_budget:,.0f}")
-st.metric("Total Spent", f"${total_spent:,.0f}")
-st.metric("Remaining", f"${remaining_budget:,.0f}")
+            category_summary = df.groupby("Category")["Amount"].sum().sort_values(ascending=False)
+            st.write("**Spending by Category:**")
+            st.bar_chart(category_summary)
 
-st.progress(min(progress, 1.0))
+            st.write("**Fixed Costs:**")
+            for category, amount in FIXED_CATEGORIES.items():
+                st.write(f"- {category}: ${amount:,.0f}")
 
-# Display Data Table
-st.subheader("🧾 Expense Log")
-st.dataframe(df)
+            st.success("Spend wisely, or perish slowly.")
+    except Exception as e:
+        st.error(f"There was an error processing the file: {e}")
+else:
+    st.warning("Please upload a CSV file to begin analysis.")
+
