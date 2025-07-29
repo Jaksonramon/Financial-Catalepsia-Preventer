@@ -1,68 +1,121 @@
 import streamlit as st
 import pandas as pd
-import datetime
+import os
+from datetime import datetime
+import altair as alt
+import json
 
-st.set_page_config(page_title="Financial Catalepsia Preventer", layout="wide")
+# ----------------------------
+# App Styling
+# ----------------------------
+st.set_page_config(page_title="My Budget Tracker 💸", layout="centered")
+st.markdown("""
+    <style>
+    * {
+        font-family: monospace !important;
+    }
+    body {
+        background-color: #F9FAFB;
+    }
+    .main {
+        background-color: #FFFFFF;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- Sidebar: Month and Year Selection ---
-st.sidebar.title("Select Month")
-today = datetime.date.today()
-def_month = today.month
+# ----------------------------
+# Load or Initialize Data
+# ----------------------------
+data_file = "expenses.json"
+if os.path.exists(data_file):
+    with open(data_file, "r") as f:
+        data = json.load(f)
+    df = pd.DataFrame(data)
+else:
+    df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
 
-year = st.sidebar.selectbox("Year", list(range(2020, today.year + 1))[::-1], index=0)
-month = st.sidebar.selectbox("Month", list(range(1, 13)), index=def_month - 1)
+# ----------------------------
+# Budget Setup
+# ----------------------------
+st.sidebar.title("📅 Monthly Setup")
+income = st.sidebar.number_input("Monthly Income", value=3600000, step=10000)
 
-# --- Fixed Categories ---
-FIXED_CATEGORIES = {
-    "Rent": 1000000,
-    "Utilities": 250000,
-    "Groceries": 500000
+fixed_expenses = {
+    "Rent": 1150000,
+    "Debt Repayment": 380000,
+    "Daycare": 300000,
+    "Gym": 90000,
+    "Internet": 100000,
+    "Dog": 60000,
+    "Transport": 100000,
+    "Pills": 60000
 }
 
-# --- Manual Entry Table for Variable Expenses ---
-st.title("💸 Financial Catalepsia Preventer")
-st.write("Helps you identify where you’re bleeding money before it kills your will to live.")
+flexible_categories = ["Groceries", "Eating Out", "Other"]
+budget_flexible = {}
+st.sidebar.subheader("Flexible Budgets")
+for cat in flexible_categories:
+    budget_flexible[cat] = st.sidebar.number_input(f"{cat}", value=200000, step=10000)
 
-st.subheader("📥 Enter Your Variable Expenses")
-num_rows = st.number_input("How many expenses do you want to enter?", min_value=1, max_value=50, value=5)
+# ----------------------------
+# Add Expense
+# ----------------------------
+st.title("💳 Daily Expense Tracker")
+with st.form("expense_form"):
+    date = st.date_input("Date", value=datetime.today())
+    category = st.selectbox("Category", list(fixed_expenses.keys()) + flexible_categories)
+    amount = st.number_input("Amount", step=1000, key="amount")
+    note = st.text_input("Note (optional)", key="note")
+    submit = st.form_submit_button("Add Expense")
+    clear = st.form_submit_button("Clear Inputs")
 
-variable_data = {
-    "Category": [],
-    "Amount": []
-}
+if clear:
+    st.experimental_rerun()
 
-for i in range(num_rows):
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        cat = st.text_input(f"Category #{i+1}", key=f"cat_{i}")
-    with col2:
-        amt = st.number_input(f"Amount #{i+1}", min_value=0, step=1000, key=f"amt_{i}")
-    variable_data["Category"].append(cat if cat else f"Unnamed {i+1}")
-    variable_data["Amount"].append(amt)
+if submit:
+    new_expense = pd.DataFrame([[date.isoformat(), category, amount, note]], columns=["Date", "Category", "Amount", "Note"])
+    df = pd.concat([df, new_expense], ignore_index=True)
+    with open(data_file, "w") as f:
+        json.dump(df.to_dict(orient="records"), f)
+    st.success("Expense added!")
 
-# --- Create DataFrame from input ---
-df = pd.DataFrame(variable_data)
+# ----------------------------
+# Summary and Visuals
+# ----------------------------
+st.header("📊 Monthly Summary")
 
-# --- Show Entered Data ---
-st.subheader(f"📋 Your Expenses for {year}-{month:02d}")
-st.dataframe(df)
+month = datetime.today().month
+df["Date"] = pd.to_datetime(df["Date"])
+df_month = df[df["Date"].dt.month == month]
 
-# --- Compute Total ---
-variable_total = df["Amount"].sum()
-fixed_total = sum(FIXED_CATEGORIES.values())
-total_spent = variable_total + fixed_total
+summary = df_month.groupby("Category")["Amount"].sum().reset_index()
+summary = summary.sort_values(by="Amount", ascending=False)
 
-st.subheader("📊 Summary")
-st.write(f"**Total Variable Expenses:** ${variable_total:,.0f}")
-st.write(f"**Total Fixed Costs:** ${fixed_total:,.0f}")
-st.write(f"**Total Spent in {year}-{month:02d}:** ${total_spent:,.0f}")
+# Total expenses
+total_spent = summary["Amount"].sum()
+fixed_total = sum(fixed_expenses.values())
+budget_total = fixed_total + sum(budget_flexible.values())
+remaining = income - total_spent
 
-# --- Charts and Breakdown ---
-category_summary = df.groupby("Category")["Amount"].sum()
-category_summary = category_summary.append(pd.Series(FIXED_CATEGORIES))
-st.write("**Spending by Category (including fixed):**")
-st.bar_chart(category_summary.sort_values(ascending=False))
+col1, col2, col3 = st.columns(3)
+col1.metric("💸 Total Spent", f"${int(total_spent):,}")
+col2.metric("🏠 Fixed Expenses", f"${int(fixed_total):,}")
+col3.metric("💰 Remaining", f"${int(remaining):,}")
 
-# --- Bleak Message ---
-st.markdown("---")
-st.write("💀 _You are probably still hemorrhaging money. But at least now you know where._")
+progress = min(total_spent / income, 1.0)
+st.progress(progress, text=f"{int(progress * 100)}% of income used")
+
+# Bar chart
+bar_chart = alt.Chart(summary).mark_bar().encode(
+    x=alt.X('Category', sort='-y'),
+    y='Amount',
+    color='Category'
+).properties(width=600)
+
+st.altair_chart(bar_chart, use_container_width=True)
+
+st.write("### Detailed Log")
+st.dataframe(df_month.sort_values(by="Date", ascending=False))
