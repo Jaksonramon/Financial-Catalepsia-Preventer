@@ -1,86 +1,68 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import json
-import os
 
 st.set_page_config(page_title="Financial Catalepsia Preventer", layout="wide")
 
-# Sidebar controls
-st.sidebar.title("Controls")
-uploaded_file = st.sidebar.file_uploader("Upload your .csv bank statement", type="csv")
-date_range = st.sidebar.date_input("Select date range", [datetime.date.today().replace(day=1), datetime.date.today()])
+# --- Sidebar: Month and Year Selection ---
+st.sidebar.title("Select Month")
+today = datetime.date.today()
+def_month = today.month
 
-# Load fixed categories from JSON or default
-fixed_json_path = "fixed_costs.json"
-if os.path.exists(fixed_json_path):
-    with open(fixed_json_path, 'r') as f:
-        FIXED_CATEGORIES = json.load(f)
-else:
-    FIXED_CATEGORIES = {
-        "Rent": 1000000,
-        "Utilities": 250000,
-        "Groceries": 500000
-    }
+year = st.sidebar.selectbox("Year", list(range(2020, today.year + 1))[::-1], index=0)
+month = st.sidebar.selectbox("Month", list(range(1, 13)), index=def_month - 1)
 
-# Allow user to modify fixed costs
-st.sidebar.subheader("Fixed Monthly Costs")
-for category in list(FIXED_CATEGORIES.keys()):
-    FIXED_CATEGORIES[category] = st.sidebar.number_input(f"{category}", value=FIXED_CATEGORIES[category], step=10000)
+# --- Fixed Categories ---
+FIXED_CATEGORIES = {
+    "Rent": 1000000,
+    "Utilities": 250000,
+    "Groceries": 500000
+}
 
-# Save updated fixed categories to JSON
-with open(fixed_json_path, 'w') as f:
-    json.dump(FIXED_CATEGORIES, f)
-
+# --- Manual Entry Table for Variable Expenses ---
 st.title("💸 Financial Catalepsia Preventer")
 st.write("Helps you identify where you’re bleeding money before it kills your will to live.")
 
-if uploaded_file is not None:
-    try:
-        df = pd.read_csv(uploaded_file)
-        df.columns = [col.strip() for col in df.columns]  # Clean up column names
+st.subheader("📥 Enter Your Variable Expenses")
+num_rows = st.number_input("How many expenses do you want to enter?", min_value=1, max_value=50, value=5)
 
-        # Show raw data
-        st.subheader("Raw Statement Data")
-        st.dataframe(df.head())
+variable_data = {
+    "Category": [],
+    "Amount": []
+}
 
-        # Ensure proper column names exist
-        if "Amount" not in df.columns or "Category" not in df.columns or "Date" not in df.columns:
-            st.error("CSV must contain 'Amount', 'Category', and 'Date' columns.")
-        else:
-            # Preprocessing
-            df["Date"] = pd.to_datetime(df["Date"], errors='coerce')
-            df = df.dropna(subset=["Date"])
-            df = df[(df["Date"] >= pd.to_datetime(date_range[0])) & (df["Date"] <= pd.to_datetime(date_range[1]))]
+for i in range(num_rows):
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        cat = st.text_input(f"Category #{i+1}", key=f"cat_{i}")
+    with col2:
+        amt = st.number_input(f"Amount #{i+1}", min_value=0, step=1000, key=f"amt_{i}")
+    variable_data["Category"].append(cat if cat else f"Unnamed {i+1}")
+    variable_data["Amount"].append(amt)
 
-            # Show filtered data
-            st.subheader("Filtered Transactions")
-            st.dataframe(df)
+# --- Create DataFrame from input ---
+df = pd.DataFrame(variable_data)
 
-            # Summaries
-            total_spent = df["Amount"].sum() + sum(FIXED_CATEGORIES.values())
-            st.subheader("📊 Summary")
-            st.write(f"**Total Spent (including fixed costs):** ${total_spent:,.0f}")
+# --- Show Entered Data ---
+st.subheader(f"📋 Your Expenses for {year}-{month:02d}")
+st.dataframe(df)
 
-            category_summary = df.groupby("Category")["Amount"].sum().sort_values(ascending=False)
-            st.write("**Spending by Category:**")
-            st.bar_chart(category_summary)
+# --- Compute Total ---
+variable_total = df["Amount"].sum()
+fixed_total = sum(FIXED_CATEGORIES.values())
+total_spent = variable_total + fixed_total
 
-            st.write("**Fixed Costs:**")
-            for category, amount in FIXED_CATEGORIES.items():
-                st.write(f"- {category}: ${amount:,.0f}")
+st.subheader("📊 Summary")
+st.write(f"**Total Variable Expenses:** ${variable_total:,.0f}")
+st.write(f"**Total Fixed Costs:** ${fixed_total:,.0f}")
+st.write(f"**Total Spent in {year}-{month:02d}:** ${total_spent:,.0f}")
 
-            # Save summary JSON
-            summary_json = {
-                "total_spent": total_spent,
-                "fixed_costs": FIXED_CATEGORIES,
-                "date_range": [str(date_range[0]), str(date_range[1])]
-            }
-            with open("summary.json", "w") as f:
-                json.dump(summary_json, f)
+# --- Charts and Breakdown ---
+category_summary = df.groupby("Category")["Amount"].sum()
+category_summary = category_summary.append(pd.Series(FIXED_CATEGORIES))
+st.write("**Spending by Category (including fixed):**")
+st.bar_chart(category_summary.sort_values(ascending=False))
 
-            st.success("Spend wisely, or perish slowly.")
-    except Exception as e:
-        st.error(f"There was an error processing the file: {e}")
-else:
-    st.warning("Please upload a CSV file to begin analysis.")
+# --- Bleak Message ---
+st.markdown("---")
+st.write("💀 _You are probably still hemorrhaging money. But at least now you know where._")
