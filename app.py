@@ -1,121 +1,98 @@
+
 import streamlit as st
 import pandas as pd
-import os
-from datetime import datetime
-import altair as alt
 import json
+from datetime import datetime
+from pathlib import Path
 
-# ----------------------------
-# App Styling
-# ----------------------------
-st.set_page_config(page_title="My Budget Tracker 💸", layout="centered")
+st.set_page_config(page_title="Budget Tracker", layout="centered")
+
 st.markdown("""
     <style>
-    * {
-        font-family: monospace !important;
-    }
-    body {
-        background-color: #F9FAFB;
-    }
-    .main {
-        background-color: #FFFFFF;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05);
-    }
+        * {
+            font-family: monospace;
+        }
+        .stButton > button {
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            cursor: pointer;
+        }
+        .stButton > button:hover {
+            background-color: #45a049;
+        }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# ----------------------------
-# Load or Initialize Data
-# ----------------------------
-data_file = "expenses.json"
-if os.path.exists(data_file):
-    with open(data_file, "r") as f:
-        data = json.load(f)
-    df = pd.DataFrame(data)
+DATA_FILE = "expenses.json"
+FIXED_CATEGORIES = {
+    "Rent": 800000,
+    "Transport": 130000,
+    "Internet": 70000,
+    "Pharmaceutical": 60000,
+}
+
+# Initialize or load data
+if Path(DATA_FILE).exists():
+    df = pd.read_json(DATA_FILE)
 else:
     df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
 
-# ----------------------------
-# Budget Setup
-# ----------------------------
-st.sidebar.title("📅 Monthly Setup")
-income = st.sidebar.number_input("Monthly Income", value=3600000, step=10000)
+# Header
+st.title("💰 Monthly Budget Tracker")
 
-fixed_expenses = {
-    "Rent": 1150000,
-    "Debt Repayment": 380000,
-    "Daycare": 300000,
-    "Gym": 90000,
-    "Internet": 100000,
-    "Dog": 60000,
-    "Transport": 100000,
-    "Pills": 60000
-}
-
-flexible_categories = ["Groceries", "Eating Out", "Other"]
-budget_flexible = {}
-st.sidebar.subheader("Flexible Budgets")
-for cat in flexible_categories:
-    budget_flexible[cat] = st.sidebar.number_input(f"{cat}", value=200000, step=10000)
-
-# ----------------------------
-# Add Expense
-# ----------------------------
-st.title("💳 Daily Expense Tracker")
+# Input fields
 with st.form("expense_form"):
-    date = st.date_input("Date", value=datetime.today())
-    category = st.selectbox("Category", list(fixed_expenses.keys()) + flexible_categories)
-    amount = st.number_input("Amount", step=1000, key="amount")
-    note = st.text_input("Note (optional)", key="note")
-    submit = st.form_submit_button("Add Expense")
-    clear = st.form_submit_button("Clear Inputs")
+    st.subheader("➕ Add New Expense")
+    category = st.selectbox("Select a category", list(FIXED_CATEGORIES.keys()) + ["Groceries", "Eating Out", "Other"])
+    amount = st.number_input("Amount", min_value=0)
+    note = st.text_input("Note (optional)")
+    submitted = st.form_submit_button("Add Expense")
 
-if clear:
-    st.experimental_rerun()
-
-if submit:
-    new_expense = pd.DataFrame([[date.isoformat(), category, amount, note]], columns=["Date", "Category", "Amount", "Note"])
-    df = pd.concat([df, new_expense], ignore_index=True)
-    with open(data_file, "w") as f:
-        json.dump(df.to_dict(orient="records"), f)
+if submitted:
+    new_expense = {
+        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Category": category,
+        "Amount": amount,
+        "Note": note,
+    }
+    df = pd.concat([df, pd.DataFrame([new_expense])], ignore_index=True)
+    df.to_json(DATA_FILE, orient="records", indent=4)
     st.success("Expense added!")
 
-# ----------------------------
-# Summary and Visuals
-# ----------------------------
-st.header("📊 Monthly Summary")
+# Clear entries section
+st.subheader("🧹 Manage Entries")
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Undo Last Entry"):
+        if not df.empty:
+            df = df[:-1]
+            df.to_json(DATA_FILE, orient="records", indent=4)
+            st.warning("Last entry removed.")
+        else:
+            st.info("No entries to remove.")
 
-month = datetime.today().month
-df["Date"] = pd.to_datetime(df["Date"])
-df_month = df[df["Date"].dt.month == month]
+with col2:
+    if st.button("Clear All Expenses"):
+        df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
+        df.to_json(DATA_FILE, orient="records", indent=4)
+        st.error("All data cleared.")
 
-summary = df_month.groupby("Category")["Amount"].sum().reset_index()
-summary = summary.sort_values(by="Amount", ascending=False)
+# Budget Summary
+st.subheader("📊 Budget Overview")
+total_budget = 1200000  # Set your total monthly budget here
+total_spent = df["Amount"].sum() + sum(FIXED_CATEGORIES.values())
+remaining_budget = total_budget - total_spent
+progress = total_spent / total_budget
 
-# Total expenses
-total_spent = summary["Amount"].sum()
-fixed_total = sum(fixed_expenses.values())
-budget_total = fixed_total + sum(budget_flexible.values())
-remaining = income - total_spent
+st.metric("Total Budget", f"${total_budget:,.0f}")
+st.metric("Total Spent", f"${total_spent:,.0f}")
+st.metric("Remaining", f"${remaining_budget:,.0f}")
 
-col1, col2, col3 = st.columns(3)
-col1.metric("💸 Total Spent", f"${int(total_spent):,}")
-col2.metric("🏠 Fixed Expenses", f"${int(fixed_total):,}")
-col3.metric("💰 Remaining", f"${int(remaining):,}")
+st.progress(min(progress, 1.0))
 
-progress = min(total_spent / income, 1.0)
-st.progress(progress, text=f"{int(progress * 100)}% of income used")
-
-# Bar chart
-bar_chart = alt.Chart(summary).mark_bar().encode(
-    x=alt.X('Category', sort='-y'),
-    y='Amount',
-    color='Category'
-).properties(width=600)
-
-st.altair_chart(bar_chart, use_container_width=True)
-
-st.write("### Detailed Log")
-st.dataframe(df_month.sort_values(by="Date", ascending=False))
+# Display Data Table
+st.subheader("🧾 Expense Log")
+st.dataframe(df)
