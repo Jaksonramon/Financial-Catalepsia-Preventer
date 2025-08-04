@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -40,26 +39,33 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Sidebar ---
-st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-st.sidebar.title("📆 Monthly Budget Setup")
-monthly_budget = st.sidebar.number_input("Enter Your Monthly Budget", min_value=0, step=50000, value=3000000)
-st.sidebar.markdown('</div>', unsafe_allow_html=True)
+# --- Fixed Categories ---
+categories = ["Food", "Transportation", "Entertainment", "Utilities", "Miscellaneous"]
 
-# --- Initialize session state for expenses ---
+# --- Initialize session state ---
 if "expenses" not in st.session_state:
     st.session_state.expenses = []
 
-# --- Main Interface ---
+if "category_budgets" not in st.session_state:
+    st.session_state.category_budgets = {cat: 0 for cat in categories}
+
+# --- Sidebar ---
+st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+st.sidebar.title("📆 Monthly Budget by Category")
+for cat in categories:
+    st.session_state.category_budgets[cat] = st.sidebar.number_input(f"{cat} Budget", min_value=0, step=50000, value=0, key=f"budget_{cat}")
+st.sidebar.markdown('</div>', unsafe_allow_html=True)
+
+# --- Main Section ---
 st.markdown('<div class="main-section">', unsafe_allow_html=True)
 st.title("💰 Budget Nostalgia")
 st.markdown("### Add a New Expense")
 
-category = st.text_input("Category")
+category = st.selectbox("Category", categories)
 amount = st.number_input("Amount Spent", min_value=0, step=1000)
 add_expense = st.button("Add Expense")
 
-if add_expense and category:
+if add_expense:
     st.session_state.expenses.append({"Category": category, "Amount": amount})
 
 # --- Create DataFrame ---
@@ -70,14 +76,20 @@ st.markdown("<div class='section-title'>📊 Budget Overview</div>", unsafe_allo
 if df.empty:
     st.write("No expenses entered yet.")
 else:
+    category_summary = df.groupby("Category")["Amount"].sum().reset_index()
+    category_summary["Budget"] = category_summary["Category"].map(st.session_state.category_budgets)
+    category_summary["Remaining"] = category_summary["Budget"] - category_summary["Amount"]
+    category_summary["% Used"] = (category_summary["Amount"] / category_summary["Budget"] * 100).fillna(0).round(2)
+
     total_spent = df["Amount"].sum()
-    remaining = monthly_budget - total_spent
+    total_budget = sum(st.session_state.category_budgets.values())
+    remaining = total_budget - total_spent
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.metric("Total Spent", f"${total_spent:,.0f}")
-        st.metric("Remaining Budget", f"${remaining:,.0f}")
+        st.metric("Total Remaining", f"${remaining:,.0f}")
 
     with col2:
         pie_chart = px.pie(df, values="Amount", names="Category",
@@ -85,11 +97,15 @@ else:
                            color_discrete_sequence=px.colors.sequential.Sunset)
         st.plotly_chart(pie_chart, use_container_width=True)
 
-    st.markdown("### Detailed Expenses")
+    st.markdown("### Category Breakdown")
+    st.dataframe(category_summary, use_container_width=True)
+
+    st.markdown("### All Expenses")
     st.dataframe(df, use_container_width=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
+# --- Sidebar Total ---
 st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-st.sidebar.markdown(f"### 📈 Used Budget: {total_spent if not df.empty else 0:,.0f} / {monthly_budget:,.0f}")
+st.sidebar.markdown(f"### 📈 Used Budget: {total_spent if not df.empty else 0:,.0f} / {total_budget:,.0f}")
 st.sidebar.markdown('</div>', unsafe_allow_html=True)
