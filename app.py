@@ -2,14 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-fig = px.pie(
-    names=labels,
-    values=data,
-    title="Budget Breakdown",
-    hole=0.3
-)
-st.plotly_chart(fig)
-
 # Initialize session state
 if 'categories' not in st.session_state:
     st.session_state.categories = [
@@ -42,14 +34,17 @@ remaining = budget - total
 st.markdown(f"### 📈 Used Budget: {total:,.0f} / {budget:,.0f} COP")
 st.markdown(f"### 💵 Remaining: {remaining:,.0f} COP")
 
-# Pie chart
+# Pie chart with Plotly
 labels = [cat['name'] for cat in st.session_state.categories]
 data = [cat['amount'] for cat in st.session_state.categories]
 
-fig, ax = plt.subplots()
-ax.pie(data, labels=labels, autopct='%1.1f%%', startangle=90)
-ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-st.pyplot(fig)
+fig = px.pie(
+    names=labels,
+    values=data,
+    title="Monthly Budget Breakdown",
+    hole=0.3
+)
+st.plotly_chart(fig)
 
 # Export Data
 if st.button("💾 Export Budget to CSV"):
