@@ -25,7 +25,7 @@ def save_data():
         json.dump(st.session_state.expenses, f)
 
 # Initialize session state
-if 'categories' not in st.session_state or 'expenses' not in st.session_state:
+if 'categories' not in st.session_state:
     st.session_state.categories = [
         { 'name': '🏠 Rent', 'amount': 1150000 },
         { 'name': '💳 Debt repayment', 'amount': 380000 },
@@ -38,7 +38,10 @@ if 'categories' not in st.session_state or 'expenses' not in st.session_state:
         { 'name': '🥦 Groceries', 'amount': 450000 },
         { 'name': '🍔 Eating out', 'amount': 250000 },
     ]
+
+if 'expenses' not in st.session_state:
     st.session_state.expenses = []
+
 load_data()
 
 st.set_page_config(page_title="Monthly Budget", layout="wide")
@@ -74,6 +77,7 @@ if st.button("Add Expense"):
 for expense in st.session_state.expenses:
     category_spending[expense['category']] += expense['amount']
 
+# Show used and remaining budget
 total = sum(cat['amount'] for cat in st.session_state.categories)
 remaining = budget - total
 
