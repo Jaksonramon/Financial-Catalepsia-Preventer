@@ -1,145 +1,85 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
+import React, { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Pie } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+} from 'chart.js';
 
-# --- Page Config ---
-st.set_page_config(page_title="Budget Nostalgia", layout="wide")
-st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Nunito&display=swap');
+ChartJS.register(ArcElement, Tooltip, Legend);
 
-        html, body, [class*="css"]  {
-            font-family: 'Nunito', sans-serif;
-            background-color: #fdf6e3;
-            color: #4b3e2a;
-        }
+const initialCategories = [
+  { name: '🏠 Rent', amount: 1150000 },
+  { name: '💳 Debt repayment', amount: 380000 },
+  { name: '👶 Daycare (Mango)', amount: 300000 },
+  { name: '🏋️ Gym', amount: 92000 },
+  { name: '🌐 Internet', amount: 98000 },
+  { name: '🐶 Dog (basic)', amount: 60000 },
+  { name: '🚌 Transport', amount: 120000 },
+  { name: '🧴 Personal care', amount: 80000 },
+  { name: '🥦 Groceries', amount: 450000 },
+  { name: '🍔 Eating out', amount: 250000 },
+];
 
-        .section-title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            color: #3e3621;
-        }
+export default function BudgetSidebar() {
+  const [categories, setCategories] = useState(initialCategories);
 
-        .sidebar-section {
-            background-color: #f4ecd8;
-            padding: 10px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #d8c9aa;
-        }
+  const updateAmount = (index, newAmount) => {
+    const updated = [...categories];
+    updated[index].amount = parseInt(newAmount) || 0;
+    setCategories(updated);
+  };
 
-        .main-section {
-            background-color: #f8f1e3;
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid #d8c9aa;
-        }
+  const total = categories.reduce((sum, cat) => sum + cat.amount, 0);
+  const budget = 3600000;
+  const remaining = budget - total;
 
-        .alert-over {
-            color: #a94442;
-            font-weight: bold;
-        }
+  const pieData = {
+    labels: categories.map((cat) => cat.name),
+    datasets: [
+      {
+        data: categories.map((cat) => cat.amount),
+        backgroundColor: [
+          '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+          '#FF9F40', '#C9CBCF', '#FFCD56', '#33FF99', '#FF6666',
+        ],
+        borderWidth: 1,
+      },
+    ],
+  };
 
-        .alert-under {
-            color: #3c763d;
-            font-weight: bold;
-        }
-    </style>
-""", unsafe_allow_html=True)
+  return (
+    <div className="p-4 space-y-4 w-full max-w-md">
+      <h2 className="text-xl font-bold">💰 Monthly Budget</h2>
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          {categories.map((cat, i) => (
+            <div key={i} className="flex items-center justify-between space-x-2">
+              <span>{cat.name}</span>
+              <Input
+                type="number"
+                value={cat.amount}
+                onChange={(e) => updateAmount(i, e.target.value)}
+                className="w-32 text-right"
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-# --- Fixed Categories with Default Budgets ---
-categories = {
-    "Food": 600000,
-    "Transportation": 300000,
-    "Entertainment": 200000,
-    "Utilities": 400000,
-    "Miscellaneous": 150000,
-    "Mango (Dog)": 250000,
-    "Apartment": 800000
+      <div className="text-sm text-gray-600">
+        <p>🔹 Total expenses so far: {total.toLocaleString()} COP</p>
+        <p>🔹 Remaining: {remaining.toLocaleString()} COP</p>
+      </div>
+
+      <div className="mt-6">
+        <h3 className="text-md font-semibold mb-2">📊 Expense Breakdown</h3>
+        <Pie data={pieData} />
+      </div>
+    </div>
+  );
 }
-
-# --- Initialize session state ---
-if "expenses" not in st.session_state:
-    st.session_state.expenses = []
-
-if "category_budgets" not in st.session_state:
-    st.session_state.category_budgets = categories.copy()
-
-# --- Sidebar ---
-st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-st.sidebar.title("📆 Monthly Budget by Category")
-for cat in categories:
-    st.session_state.category_budgets[cat] = st.sidebar.number_input(
-        f"{cat} Budget",
-        min_value=0,
-        step=50000,
-        value=st.session_state.category_budgets.get(cat, categories[cat]),
-        key=f"budget_{cat}"
-    )
-st.sidebar.markdown('</div>', unsafe_allow_html=True)
-
-# --- Main Section ---
-st.markdown('<div class="main-section">', unsafe_allow_html=True)
-st.title("💰 Budget Nostalgia")
-st.markdown("### Add a New Expense")
-
-category = st.selectbox("Category", list(categories.keys()))
-amount = st.number_input("Amount Spent", min_value=0, step=1000)
-add_expense = st.button("Add Expense")
-
-if add_expense:
-    st.session_state.expenses.append({"Category": category, "Amount": amount})
-
-# --- Create DataFrame ---
-df = pd.DataFrame(st.session_state.expenses)
-
-# --- Budget Overview ---
-st.markdown("<div class='section-title'>📊 Budget Overview</div>", unsafe_allow_html=True)
-if df.empty:
-    st.write("No expenses entered yet.")
-    total_spent = 0
-    total_budget = sum(st.session_state.category_budgets.values())
-else:
-    category_summary = df.groupby("Category")["Amount"].sum().reset_index()
-    category_summary["Budget"] = category_summary["Category"].map(st.session_state.category_budgets)
-    category_summary["Remaining"] = category_summary["Budget"] - category_summary["Amount"]
-    category_summary["% Used"] = (category_summary["Amount"] / category_summary["Budget"] * 100).fillna(0).round(2)
-
-    total_spent = df["Amount"].sum()
-    total_budget = sum(st.session_state.category_budgets.values())
-    remaining = total_budget - total_spent
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.metric("Total Spent", f"${total_spent:,.0f}")
-        st.metric("Total Remaining", f"${remaining:,.0f}")
-
-    with col2:
-        pie_chart = px.pie(df, values="Amount", names="Category",
-                           title="Spending by Category",
-                           color_discrete_sequence=px.colors.sequential.Sunset)
-        st.plotly_chart(pie_chart, use_container_width=True)
-
-    st.markdown("### Category Breakdown")
-    for _, row in category_summary.iterrows():
-        status = "✅ Within Budget"
-        css_class = "alert-under"
-        if row["Amount"] > row["Budget"]:
-            status = "🚨 Over Budget"
-            css_class = "alert-over"
-
-        st.markdown(f"**{row['Category']}**: ${row['Amount']:,.0f} / ${row['Budget']:,.0f} ", unsafe_allow_html=True)
-        st.markdown(f"<span class='{css_class}'>{status}</span>", unsafe_allow_html=True)
-
-    st.markdown("### All Expenses")
-    st.dataframe(df, use_container_width=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# --- Sidebar Total ---
-st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-st.sidebar.markdown(f"### 📈 Used Budget: {total_spent:,.0f} / {total_budget:,.0f}")
-st.sidebar.markdown('</div>', unsafe_allow_html=True)
