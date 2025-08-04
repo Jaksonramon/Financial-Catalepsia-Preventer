@@ -49,21 +49,33 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Fixed Categories ---
-categories = ["Food", "Transportation", "Entertainment", "Utilities", "Miscellaneous"]
+# --- Fixed Categories with Default Budgets ---
+categories = {
+    "Food": 600000,
+    "Transportation": 300000,
+    "Entertainment": 200000,
+    "Utilities": 400000,
+    "Miscellaneous": 150000
+}
 
 # --- Initialize session state ---
 if "expenses" not in st.session_state:
     st.session_state.expenses = []
 
 if "category_budgets" not in st.session_state:
-    st.session_state.category_budgets = {cat: 0 for cat in categories}
+    st.session_state.category_budgets = categories.copy()
 
 # --- Sidebar ---
 st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
 st.sidebar.title("📆 Monthly Budget by Category")
 for cat in categories:
-    st.session_state.category_budgets[cat] = st.sidebar.number_input(f"{cat} Budget", min_value=0, step=50000, value=st.session_state.category_budgets.get(cat, 0), key=f"budget_{cat}")
+    st.session_state.category_budgets[cat] = st.sidebar.number_input(
+        f"{cat} Budget",
+        min_value=0,
+        step=50000,
+        value=st.session_state.category_budgets.get(cat, categories[cat]),
+        key=f"budget_{cat}"
+    )
 st.sidebar.markdown('</div>', unsafe_allow_html=True)
 
 # --- Main Section ---
@@ -71,7 +83,7 @@ st.markdown('<div class="main-section">', unsafe_allow_html=True)
 st.title("💰 Budget Nostalgia")
 st.markdown("### Add a New Expense")
 
-category = st.selectbox("Category", categories)
+category = st.selectbox("Category", list(categories.keys()))
 amount = st.number_input("Amount Spent", min_value=0, step=1000)
 add_expense = st.button("Add Expense")
 
