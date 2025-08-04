@@ -46,67 +46,74 @@ load_data()
 
 st.set_page_config(page_title="Monthly Budget", layout="wide")
 
+# Sidebar controls
 with st.sidebar:
-    st.title("📝 Budget Sidebar")
-    st.subheader("Adjust Your Categories")
+    st.title("📝 Budget Controls")
+    st.subheader("Adjust Monthly Budget")
     for category in st.session_state.categories:
         category['amount'] = st.number_input(
             category['name'], value=int(category.get('amount', 0)), step=1000, format="%d"
         )
-    if st.button("💾 Save Changes"):
+    if st.button("💾 Save Budget"):
         save_data()
-        st.success("Changes saved!")
+        st.success("Budget changes saved!")
 
-st.title("💰 Monthly Budget Tracker")
+    st.markdown("---")
+    st.subheader("➕ Add New Expense")
+    expense_category = st.selectbox("Select Category", [cat['name'] for cat in st.session_state.categories])
+    expense_amount = st.number_input("Amount", min_value=0, step=1000)
+    if st.button("Add Expense"):
+        st.session_state.expenses.append({"category": expense_category, "amount": expense_amount})
+        save_data()
+        st.success(f"Added {expense_amount} to {expense_category}")
 
-# Total calculation
+st.title("💰 Monthly Budget Dashboard")
+
+# Budget calculations
 budget = 3600000
 category_totals = {cat['name']: cat['amount'] for cat in st.session_state.categories}
 category_spending = {cat['name']: 0 for cat in st.session_state.categories}
 
-# Input new expense
-st.subheader("➕ Add New Expense")
-expense_category = st.selectbox("Select Category", [cat['name'] for cat in st.session_state.categories])
-expense_amount = st.number_input("Amount", min_value=0, step=1000)
-if st.button("Add Expense"):
-    st.session_state.expenses.append({"category": expense_category, "amount": expense_amount})
-    save_data()
-    st.success(f"Added {expense_amount} to {expense_category}")
-
-# Aggregate spending
 for expense in st.session_state.expenses:
-    category_spending[expense['category']] += expense['amount']
+    if expense['category'] in category_spending:
+        category_spending[expense['category']] += expense['amount']
 
-# Show used and remaining budget
-total = sum(cat['amount'] for cat in st.session_state.categories)
-remaining = budget - total
+# Totals
+total_allocated = sum(cat['amount'] for cat in st.session_state.categories)
+total_spent = sum(category_spending.values())
+remaining = budget - total_allocated
 
-st.markdown(f"### 📈 Used Budget: {total:,.0f} / {budget:,.0f} COP")
-st.markdown(f"### 💵 Remaining: {remaining:,.0f} COP")
+# KPIs
+st.markdown(f"### 🧾 Allocated: {total_allocated:,.0f} / {budget:,.0f} COP")
+st.markdown(f"### 💸 Spent: {total_spent:,.0f} COP")
+st.markdown(f"### 💵 Remaining Allocation Room: {remaining:,.0f} COP")
 
-# Pie chart with Plotly
-labels = [cat['name'] for cat in st.session_state.categories]
-data = [cat['amount'] for cat in st.session_state.categories]
-
+# Pie chart
 fig = px.pie(
-    names=labels,
-    values=data,
-    title="📊 Monthly Budget Breakdown",
+    names=[cat['name'] for cat in st.session_state.categories],
+    values=[cat['amount'] for cat in st.session_state.categories],
+    title="📊 Monthly Budget Distribution",
     hole=0.3
 )
 st.plotly_chart(fig, use_container_width=True)
 
-# Show progress bars per category
-st.subheader("📊 Budget Progress by Category")
+# Progress bars
+st.subheader("📊 Spending Progress by Category")
 for cat in st.session_state.categories:
-    spent = category_spending[cat['name']]
+    spent = category_spending.get(cat['name'], 0)
     budgeted = cat['amount']
     percent = min(spent / budgeted, 1.0) if budgeted else 0
-    st.markdown(f"**{cat['name']}**: {spent:,.0f} / {budgeted:,.0f} COP")
-    st.progress(percent)
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown(f"**{cat['name']}**: {spent:,.0f} / {budgeted:,.0f} COP")
+        st.progress(percent)
+    with col2:
+        st.markdown(f"{percent * 100:.1f}%")
 
-# Export Data
-if st.button("📁 Export Budget to CSV"):
-    df = pd.DataFrame(st.session_state.categories)
-    df.to_csv("monthly_budget.csv", index=False)
-    st.success("File saved as monthly_budget.csv")
+# Download button
+if st.button("📁 Export Budget & Expenses to CSV"):
+    df_budget = pd.DataFrame(st.session_state.categories)
+    df_expenses = pd.DataFrame(st.session_state.expenses)
+    df_budget.to_csv("monthly_budget.csv", index=False)
+    df_expenses.to_csv("monthly_expenses.csv", index=False)
+    st.success("CSV files saved: monthly_budget.csv & monthly_expenses.csv")
