@@ -1,6 +1,14 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.express as px
+
+fig = px.pie(
+    names=labels,
+    values=data,
+    title="Budget Breakdown",
+    hole=0.3
+)
+st.plotly_chart(fig)
 
 # Initialize session state
 if 'categories' not in st.session_state:
