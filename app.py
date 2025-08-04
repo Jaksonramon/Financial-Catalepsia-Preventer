@@ -2,10 +2,6 @@ import streamlit as st
 import pandas as pd
 import datetime
 import plotly.express as px
-streamlit
-pandas
-plotly
-
 
 # --- Page Config ---
 st.set_page_config(page_title="Budget Nostalgia", layout="wide")
@@ -94,6 +90,7 @@ else:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
+# --- Sidebar Budget Usage ---
 st.sidebar.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
 st.sidebar.markdown(f"### 📈 Used Budget: {total_spent if not df.empty else 0:,.0f} / {monthly_budget:,.0f}")
 st.sidebar.markdown('</div>', unsafe_allow_html=True)
