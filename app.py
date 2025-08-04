@@ -55,7 +55,9 @@ categories = {
     "Transportation": 300000,
     "Entertainment": 200000,
     "Utilities": 400000,
-    "Miscellaneous": 150000
+    "Miscellaneous": 150000,
+    "Mango (Dog)": 250000,
+    "Apartment": 800000
 }
 
 # --- Initialize session state ---
