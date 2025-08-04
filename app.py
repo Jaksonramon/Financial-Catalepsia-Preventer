@@ -75,8 +75,11 @@ category_totals = {cat['name']: cat['amount'] for cat in st.session_state.catego
 category_spending = {cat['name']: 0 for cat in st.session_state.categories}
 
 for expense in st.session_state.expenses:
-    if expense['category'] in category_spending:
-        category_spending[expense['category']] += expense['amount']
+   for expense in st.session_state.expenses:
+    if isinstance(expense, dict) and 'category' in expense and 'amount' in expense:
+        if expense['category'] in category_spending:
+            category_spending[expense['category']] += expense['amount']
+
 
 # Totals
 total_allocated = sum(cat['amount'] for cat in st.session_state.categories)
