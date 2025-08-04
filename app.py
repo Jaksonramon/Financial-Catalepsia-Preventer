@@ -1,98 +1,58 @@
-
 import streamlit as st
-import pandas as pd
 import json
-from datetime import datetime
-from pathlib import Path
+import os
 
-st.set_page_config(page_title="Budget Tracker", layout="centered")
+DATA_FILE = "budget_data.json"
 
-st.markdown("""
-    <style>
-        * {
-            font-family: monospace;
-        }
-        .stButton > button {
-            border-radius: 5px;
-            background-color: #4CAF50;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            cursor: pointer;
-        }
-        .stButton > button:hover {
-            background-color: #45a049;
-        }
-    </style>
-""", unsafe_allow_html=True)
+# --- Load & Save Functions ---
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    return {"categories": {}, "total_budget": 0}
 
-DATA_FILE = "expenses.json"
-FIXED_CATEGORIES = {
-    "Rent": 800000,
-    "Transport": 130000,
-    "Internet": 70000,
-    "Pharmaceutical": 60000,
-}
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
-# Initialize or load data
-if Path(DATA_FILE).exists():
-    df = pd.read_json(DATA_FILE)
-else:
-    df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
+# --- UI ---
+st.title("📊 Budget Tracker")
 
-# Header
-st.title("💰 Monthly Budget Tracker")
+data = load_data()
 
-# Input fields
-with st.form("expense_form"):
-    st.subheader("➕ Add New Expense")
-    category = st.selectbox("Select a category", list(FIXED_CATEGORIES.keys()) + ["Groceries", "Eating Out", "Other"])
-    amount = st.number_input("Amount", min_value=0)
-    note = st.text_input("Note (optional)")
-    submitted = st.form_submit_button("Add Expense")
+# Budget Setup
+st.header("1. Set Monthly Budget")
+data["total_budget"] = st.number_input("Total Monthly Budget", min_value=0, value=data.get("total_budget", 0))
 
-if submitted:
-    new_expense = {
-        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "Category": category,
-        "Amount": amount,
-        "Note": note,
-    }
-    df = pd.concat([df, pd.DataFrame([new_expense])], ignore_index=True)
-    df.to_json(DATA_FILE, orient="records", indent=4)
-    st.success("Expense added!")
+# Expense Entry
+st.header("2. Add Expense")
+category = st.text_input("Category (e.g. groceries, rent, transport)")
+amount = st.number_input("Amount", min_value=0, value=0)
 
-# Clear entries section
-st.subheader("🧹 Manage Entries")
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("Undo Last Entry"):
-        if not df.empty:
-            df = df[:-1]
-            df.to_json(DATA_FILE, orient="records", indent=4)
-            st.warning("Last entry removed.")
-        else:
-            st.info("No entries to remove.")
+if st.button("➕ Add Expense"):
+    if category:
+        data["categories"][category] = data["categories"].get(category, 0) + amount
+        save_data(data)
+        st.success(f"Added {amount} to {category}.")
 
-with col2:
-    if st.button("Clear All Expenses"):
-        df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
-        df.to_json(DATA_FILE, orient="records", indent=4)
-        st.error("All data cleared.")
+# Progress Visualization
+st.header("3. Budget Overview")
 
-# Budget Summary
-st.subheader("📊 Budget Overview")
-total_budget = 1200000  # Set your total monthly budget here
-total_spent = df["Amount"].sum() + sum(FIXED_CATEGORIES.values())
-remaining_budget = total_budget - total_spent
-progress = total_spent / total_budget
+total_spent = sum(data["categories"].values())
+remaining = data["total_budget"] - total_spent
 
-st.metric("Total Budget", f"${total_budget:,.0f}")
-st.metric("Total Spent", f"${total_spent:,.0f}")
-st.metric("Remaining", f"${remaining_budget:,.0f}")
+st.metric("Total Spent", f"${total_spent}")
+st.metric("Remaining", f"${remaining}")
 
+progress = total_spent / data["total_budget"] if data["total_budget"] else 0
 st.progress(min(progress, 1.0))
 
-# Display Data Table
-st.subheader("🧾 Expense Log")
-st.dataframe(df)
+# Category Breakdown
+st.subheader("Category Breakdown")
+for cat, amt in data["categories"].items():
+    st.write(f"**{cat}**: ${amt}")
+
+# Reset
+if st.button("🔁 Reset All Data"):
+    save_data({"categories": {}, "total_budget": 0})
+    st.success("Data has been reset.")
