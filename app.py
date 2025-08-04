@@ -1,64 +1,98 @@
+
 import streamlit as st
 import pandas as pd
-import datetime
+import json
+from datetime import datetime
+from pathlib import Path
 
-st.set_page_config(page_title="Financial Catalepsia Preventer", layout="wide")
+st.set_page_config(page_title="Budget Tracker", layout="centered")
 
-# --- Fixed Categories (Annual) ---
+st.markdown("""
+    <style>
+        * {
+            font-family: monospace;
+        }
+        .stButton > button {
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            cursor: pointer;
+        }
+        .stButton > button:hover {
+            background-color: #45a049;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+DATA_FILE = "expenses.json"
 FIXED_CATEGORIES = {
-    "Rent": 12000000,        # Annual
-    "Utilities": 3000000,    # Annual
-    "Groceries": 6000000     # Annual
+    "Rent": 800000,
+    "Transport": 130000,
+    "Internet": 70000,
+    "Pharmaceutical": 60000,
 }
 
-# --- Sidebar: Monthly Budget Entry ---
-st.sidebar.title("📆 Monthly Setup")
-monthly_income = st.sidebar.number_input("Monthly Income", min_value=0, step=50000, value=3000000)
-
-st.sidebar.markdown("---")
-
-# --- Add Expense Entry ---
-st.sidebar.title("➕ Add an Expense")
-category = st.sidebar.selectbox("Select Category", ["Food", "Transport", "Entertainment", "Health", "Other"])
-amount = st.sidebar.number_input("Amount", min_value=0, step=1000)
-add_expense = st.sidebar.button("Add Expense")
-
-# --- Session State to Store Expenses ---
-if "expenses" not in st.session_state:
-    st.session_state.expenses = []
-
-if add_expense:
-    st.session_state.expenses.append({"Category": category, "Amount": amount})
-
-# --- Create DataFrame ---
-df = pd.DataFrame(st.session_state.expenses)
-
-# --- Main Page ---
-st.title("💸 Financial Catalepsia Preventer")
-st.write("Helps you identify where you’re bleeding money before it kills your will to live.")
-
-st.subheader("📋 Your Entered Expenses")
-if df.empty:
-    st.write("No expenses entered yet.")
+# Initialize or load data
+if Path(DATA_FILE).exists():
+    df = pd.read_json(DATA_FILE)
 else:
-    st.dataframe(df)
+    df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
 
-    # --- Summary Calculations ---
-    variable_total = df["Amount"].sum()
-    fixed_monthly_total = sum(FIXED_CATEGORIES.values()) / 12
-    total_spent = variable_total + fixed_monthly_total
-    remaining = monthly_income - total_spent
+# Header
+st.title("💰 Monthly Budget Tracker")
 
-    st.subheader("📊 Summary")
-    st.write(f"**Total Variable Expenses:** ${variable_total:,.0f}")
-    st.write(f"**Monthly Share of Fixed Costs:** ${fixed_monthly_total:,.0f}")
-    st.write(f"**Total Spent This Month:** ${total_spent:,.0f}")
-    st.write(f"**Remaining Budget:** ${remaining:,.0f}")
+# Input fields
+with st.form("expense_form"):
+    st.subheader("➕ Add New Expense")
+    category = st.selectbox("Select a category", list(FIXED_CATEGORIES.keys()) + ["Groceries", "Eating Out", "Other"])
+    amount = st.number_input("Amount", min_value=0)
+    note = st.text_input("Note (optional)")
+    submitted = st.form_submit_button("Add Expense")
 
-    # --- Charts and Breakdown ---
-    category_summary = df.groupby("Category")["Amount"].sum()
-    st.write("**Spending by Category:**")
-    st.bar_chart(category_summary.sort_values(ascending=False))
+if submitted:
+    new_expense = {
+        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Category": category,
+        "Amount": amount,
+        "Note": note,
+    }
+    df = pd.concat([df, pd.DataFrame([new_expense])], ignore_index=True)
+    df.to_json(DATA_FILE, orient="records", indent=4)
+    st.success("Expense added!")
 
-st.markdown("---")
-st.write("💀 _You are probably still hemorrhaging money. But at least now you know where._")
+# Clear entries section
+st.subheader("🧹 Manage Entries")
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Undo Last Entry"):
+        if not df.empty:
+            df = df[:-1]
+            df.to_json(DATA_FILE, orient="records", indent=4)
+            st.warning("Last entry removed.")
+        else:
+            st.info("No entries to remove.")
+
+with col2:
+    if st.button("Clear All Expenses"):
+        df = pd.DataFrame(columns=["Date", "Category", "Amount", "Note"])
+        df.to_json(DATA_FILE, orient="records", indent=4)
+        st.error("All data cleared.")
+
+# Budget Summary
+st.subheader("📊 Budget Overview")
+total_budget = 1200000  # Set your total monthly budget here
+total_spent = df["Amount"].sum() + sum(FIXED_CATEGORIES.values())
+remaining_budget = total_budget - total_spent
+progress = total_spent / total_budget
+
+st.metric("Total Budget", f"${total_budget:,.0f}")
+st.metric("Total Spent", f"${total_spent:,.0f}")
+st.metric("Remaining", f"${remaining_budget:,.0f}")
+
+st.progress(min(progress, 1.0))
+
+# Display Data Table
+st.subheader("🧾 Expense Log")
+st.dataframe(df)
