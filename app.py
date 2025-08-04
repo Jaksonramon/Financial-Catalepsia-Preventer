@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 import datetime
 import plotly.express as px
+streamlit
+pandas
+plotly
+
 
 # --- Page Config ---
 st.set_page_config(page_title="Budget Nostalgia", layout="wide")
