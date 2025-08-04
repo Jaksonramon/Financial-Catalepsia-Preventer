@@ -4,46 +4,6 @@ import plotly.express as px
 import json
 import os
 
-# Initialize session state before loading
-if 'categories' not in st.session_state or 'expenses' not in st.session_state:
-    # Load from file if possible
-    if os.path.exists(BUDGET_FILE) and os.path.exists(EXPENSE_FILE):
-        load_data()
-    else:
-        # Use defaults
-        st.session_state.categories = [
-            { 'name': '🏠 Rent', 'amount': 1150000 },
-            { 'name': '💳 Debt repayment', 'amount': 380000 },
-            { 'name': '👶 Daycare (Mango)', 'amount': 300000 },
-            { 'name': '🏋️ Gym', 'amount': 92000 },
-            { 'name': '🌐 Internet', 'amount': 98000 },
-            { 'name': '🐶 Dog (basic)', 'amount': 60000 },
-            { 'name': '🚌 Transport', 'amount': 120000 },
-            { 'name': '🧴 Personal care', 'amount': 80000 },
-            { 'name': '🥦 Groceries', 'amount': 450000 },
-            { 'name': '🍔 Eating out', 'amount': 250000 },
-        ]
-        st.session_state.expenses = []
-
-
-# Now safe to load data
-load_data()
-
-# If no data was loaded, set default categories
-if not st.session_state.categories:
-    st.session_state.categories = [
-        { 'name': '🏠 Rent', 'amount': 1150000 },
-        { 'name': '💳 Debt repayment', 'amount': 380000 },
-        { 'name': '👶 Daycare (Mango)', 'amount': 300000 },
-        { 'name': '🏋️ Gym', 'amount': 92000 },
-        { 'name': '🌐 Internet', 'amount': 98000 },
-        { 'name': '🐶 Dog (basic)', 'amount': 60000 },
-        { 'name': '🚌 Transport', 'amount': 120000 },
-        { 'name': '🧴 Personal care', 'amount': 80000 },
-        { 'name': '🥦 Groceries', 'amount': 450000 },
-        { 'name': '🍔 Eating out', 'amount': 250000 },
-    ]
-
 # Data persistence
 BUDGET_FILE = "budget_data.json"
 EXPENSE_FILE = "expenses_data.json"
