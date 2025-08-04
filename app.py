@@ -17,14 +17,17 @@ if 'categories' not in st.session_state:
         { 'name': '🍔 Eating out', 'amount': 250000 },
     ]
 
-st.title("💰 Monthly Budget Tracker")
-st.subheader("Edit your monthly budget categories")
+st.set_page_config(page_title="Monthly Budget", layout="wide")
 
-# Sidebar input for each category
-for category in st.session_state.categories:
-    category['amount'] = st.number_input(
-        category['name'], value=category['amount'], step=1000, format="%d"
-    )
+with st.sidebar:
+    st.title("📝 Budget Sidebar")
+    st.subheader("Adjust Your Categories")
+    for category in st.session_state.categories:
+        category['amount'] = st.number_input(
+            category['name'], value=category['amount'], step=1000, format="%d"
+        )
+
+st.title("💰 Monthly Budget Tracker")
 
 # Total calculation
 budget = 3600000
@@ -41,10 +44,10 @@ data = [cat['amount'] for cat in st.session_state.categories]
 fig = px.pie(
     names=labels,
     values=data,
-    title="Monthly Budget Breakdown",
+    title="📊 Monthly Budget Breakdown",
     hole=0.3
 )
-st.plotly_chart(fig)
+st.plotly_chart(fig, use_container_width=True)
 
 # Export Data
 if st.button("💾 Export Budget to CSV"):
